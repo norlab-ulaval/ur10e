@@ -102,9 +102,10 @@ void RobotModel::fk(Vec6& q, Vec3& pos_result, Mat3& Q_result)
     r2 = r3 + P1 * a[1];
     pos_result = r2 + a[0];
 }
-Vec6 RobotModel::ik(Vec3 tar_pos, Mat3 tar_rot, Vec6 guess_joint)
+bool RobotModel::ik(Vec3 tar_pos, Mat3 tar_rot, Vec6 guess_joint, Vec6 &result_joint)
 {
     Vec6 q = guess_joint;
+    bool success = false;
 
     double epsilon = 0.000000005;
     Vec6 cos_th;
@@ -194,7 +195,7 @@ Vec6 RobotModel::ik(Vec3 tar_pos, Mat3 tar_rot, Vec6 guess_joint)
         EQ1 = E * P6;
 
         // fill in the jacobian (first 9 rows)
-        // --> this works because the EQ matrices are column major, and so is the 12x6 jacobian matrix
+        // --> this works because the matrices are column major
         std::copy(EQ1.begin(), EQ1.end(), J.pointer_to(0, 0));
         std::copy(EQ2.begin(), EQ2.end(), J.pointer_to(0, 1));
         std::copy(EQ3.begin(), EQ3.end(), J.pointer_to(0, 2));
@@ -237,13 +238,10 @@ Vec6 RobotModel::ik(Vec3 tar_pos, Mat3 tar_rot, Vec6 guess_joint)
 
         if (Ek < 1e-6)
         {
+            result_joint = q;
+            success = true;
             break;
         }
-        else if (iter == 9)
-        {
-            ROS_WARN("IK never converged, Ek: %f.", Ek);
-        }
     }
-
-    return q;
+    return success;
 }

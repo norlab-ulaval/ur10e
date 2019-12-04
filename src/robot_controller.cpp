@@ -19,7 +19,7 @@ RobotController::RobotController()
  * - Read the state of the robot and update the object's variables such as the
  *      last known robot time and position.
  *
- * (intput) msg -> pointer to the current state of the trajectory following action.
+ * @param msg -> pointer to the current state of the trajectory following action.
  */
 void RobotController::state_callback(const MsgTrajState::ConstPtr& msg)
 {
@@ -44,7 +44,7 @@ void RobotController::state_callback(const MsgTrajState::ConstPtr& msg)
  * - Read the joystick state and update the velocity command. This is used by
  *      the cartesian velocity control mode.
  *
- * (intput) joy -> pointer containing the current joy state
+ * @param msg -> pointer containing the current joy state
  */
 void RobotController::joy_callback(const MsgJoy::ConstPtr& msg)
 {
@@ -96,11 +96,11 @@ void RobotController::joy_callback(const MsgJoy::ConstPtr& msg)
     //-- button to start the velocity control
     if (msg->buttons[2])
     {
-        command = Command::stop;
+        events.add(Command::stop);
     }
     else if (msg->buttons[1])
     {
-        command = Command::start_cart_velocity;
+        events.add(Command::start_cart_velocity);
     }
     if (msg->buttons[0] && !msg->buttons[3])
     {
@@ -131,7 +131,17 @@ void RobotController::control()
     {
     case State::standstill:
     {
-        if (command == Command::start_cart_velocity)
+        // check all events
+        if (events.has_error)
+        {
+            state = State::error;
+            break;
+        }
+        else if (events == Command::stop)
+        {
+            break;
+        }
+        else if (events == Command::start_cart_velocity)
         {
             robot_model.fk(cur_joint_pos, cur_cart_pos_goal, cur_cart_rot_goal);
             state = State::cart_velocity;
@@ -143,10 +153,16 @@ void RobotController::control()
     // Control the robot with the joystick in cartesian velocity mode
     case State::cart_velocity:
     {
-        if (command == Command::stop)
+        // check all events
+        if (events.has_error)
+        {
+            state = State::error;
+            break;
+        }
+        else if (events == Command::stop)
         {
             state = State::stopping;
-            break; // --> don't execute
+            break;
         }
 
         velocity_control();
@@ -157,8 +173,13 @@ void RobotController::control()
     // safely stop the robot and return to standstill when done
     case State::stopping:
     {
-        bool done = stopping_control();
+        if (events.has_error)
+        {
+            state = State::error;
+            break;
+        }
 
+        bool done = stopping_control();
         if (done)
         {
             state = State::standstill;
@@ -171,7 +192,11 @@ void RobotController::control()
     // Cannot do anything unless the reset command is set and there are no more errors
     case State::error:
     {
-        if (command == Command::reset)
+        if (events.has_error)
+        {
+            break;
+        }
+        else if (events == Command::reset)
         {
             state = State::standstill;
         }
@@ -179,13 +204,15 @@ void RobotController::control()
     }
     }
 
-    command = Command::none; // reset to not reprocess the same command twice
+
+    // todo: save errors before clearing events
+    // remove all events from the deque
+    events.clear();
 }
 
 
 
-/**
- * - Control function for the velocity control.
+/** Control function for the velocity control with the joystick.
  * - Uses the current joystick command to determine the velocity command.
  * - Transforms the velocity command into a a new position command (cartesian).
  * - Performs the inverse kinematics of that point to obtain a goal joint pose.
@@ -203,7 +230,6 @@ void RobotController::velocity_control()
     if (norm_squared(cart_vel_goal.first3()) > 1e-6)
     {
         next_pos += cart_vel_goal.first3() * duration;
-        cur_cart_pos_goal = next_pos;
     }
     Mat3 next_rot = cur_cart_rot_goal;
     if (norm_squared(cart_vel_goal.last3()) > 1e-6)
@@ -211,14 +237,9 @@ void RobotController::velocity_control()
         // note: premultiplied by next_rot to rotate about the tool axes
         Vec3 u = next_rot*cart_vel_goal.last3();
         double th = norm(u);
-        if (small(th))
-            ROS_WARN("normalizing a vector that is too close to zero, norm: %f", th);
         u /= th;
-
-        if (!is_unit(u))
-            ROS_WARN("The unit direction vector is not really unit, norm: %f", norm(u));
-
         th *= duration;
+
         double c = cos(th);
         double s = sin(th);
         double cm1 = 1.0-c;
@@ -240,20 +261,29 @@ void RobotController::velocity_control()
         };
         // note: delta rotation is in TOOL coordinates
 
-
         next_rot = delta_rot * next_rot;
         if (!next_rot.is_unit())
             ROS_WARN("Rotation matrix is no longer orthogonal!");
-
-        cur_cart_rot_goal = next_rot;
     }
 
     // compute the associated joint positions (inverse kinematics)
-    Vec6 joint_goal = robot_model.ik(next_pos, next_rot, cur_joint_pos);
+    Vec6 joint_goal = cur_joint_pos;
+    if (robot_model.ik(next_pos, next_rot, cur_joint_pos, joint_goal))
+    {
+        cur_cart_pos_goal = next_pos;
+        cur_cart_rot_goal = next_rot;
+        command_msg.goal.trajectory.points[0].positions
+            = {joint_goal.begin(), joint_goal.end()};
+    }
+    else
+    {
+        command_msg.goal.trajectory.points[0].positions
+            = {cur_joint_pos.begin(), cur_joint_pos.end()};
+        events.add(Warning::ik_not_converge);
+    }
 
-    // send goal
+    // send message
     command_msg.goal.trajectory.header.stamp = joints_msg->header.stamp;
-    command_msg.goal.trajectory.points[0].positions = {joint_goal.begin(), joint_goal.end()};
     command_msg.goal.trajectory.points[0].time_from_start = ros::Duration(duration);
     command_pub.publish(command_msg);
 }
@@ -262,7 +292,7 @@ void RobotController::velocity_control()
 
 bool RobotController::stopping_control()
 {
-    // todo: properly cancel the current trajectory
+    // todo: properly cancel all trajectories
     Vec6 vel = joints_msg->actual.velocities;
     return small(vel);
 }

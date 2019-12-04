@@ -8,6 +8,7 @@
 #include <trajectory_msgs/JointTrajectory.h>
 
 #include "robot_model.h"
+#include "robot_events.h"
 #include "linear.h"
 
 
@@ -31,19 +32,12 @@ enum class State
     stopping,
     error,
 };
-enum class Command
-{
-    none,
-    stop,
-    reset,
-    start_cart_velocity,
-};
 
 struct RobotController
 {
-    State       state = State::standstill;
-    Command     command = Command::none;
-    RobotModel  robot_model;
+    State           state = State::standstill;
+    EventsManager   events;
+    RobotModel      robot_model;
 
     // ROS messaging
     Subscriber             joints_sub;
@@ -72,11 +66,9 @@ struct RobotController
     void velocity_control();
     bool stopping_control();
 
-
     //---- callbacks ----
     void state_callback(const MsgTrajState::ConstPtr& pos);
     void joy_callback(const MsgJoy::ConstPtr& joy);
-
 };
 
 

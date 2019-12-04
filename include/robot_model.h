@@ -20,5 +20,5 @@ struct RobotModel
     void reset();
     void calibrate();
     void fk(Vec6& q, Vec3& pos_result, Mat3& Q_result);
-    Vec6 ik(Vec3 tar_pos, Mat3 tar_rot, Vec6 joint_guess);
+    bool ik(Vec3 tar_pos, Mat3 tar_rot, Vec6 joint_guess, Vec6& joint_result);
 };

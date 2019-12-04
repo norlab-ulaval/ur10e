@@ -11,3 +11,4 @@ Norlab's controller for the UR10e manipulator with ROS and the official Universa
 
 
 ### Nice to have
+- Create GUI to help manage the different control modes and get feedback
