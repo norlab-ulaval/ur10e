@@ -1,4 +1,0 @@
-<launch>
-    <node pkg="ur10e_controller" type="ur10e_controller" name="ur_controller" />
-
-</launch>
