@@ -1,0 +1,7 @@
+<library path="src">
+  <class name="ur10e_gui" type="ur10e_gui.gui.Gui" base_class_type="rqt_gui_py::Plugin">
+    <description>
+      An example Python GUI plugin to create a great user interface.
+    </description>
+  </class>
+</library>

@@ -9,6 +9,7 @@
 RobotController::RobotController()
 {
     robot_model.calibrate();
+    state = State::standstill;
 }
 
 
@@ -204,6 +205,9 @@ void RobotController::control()
     }
     }
 
+    // send state to other nodes (GUI)
+    state_msg.data = (uint16_t)state;
+    state_pub.publish(state_msg);
 
     // todo: save errors before clearing events
     // remove all events from the deque
@@ -287,6 +291,14 @@ void RobotController::velocity_control()
     command_msg.goal.trajectory.points[0].time_from_start = ros::Duration(duration);
     command_pub.publish(command_msg);
 }
+
+
+
+void RobotController::position_control()
+{
+
+}
+
 
 
 
