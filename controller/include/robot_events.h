@@ -3,27 +3,14 @@
 #include <vector>
 
 
-// types of errors
-enum class EventType
-{
-    none,
-    error,
-    warning,
-    command,
-};
-
 
 // data types for error events
 enum class Error
 {
     none,
     traj_action_err,
-    target_computation_err
-};
-struct EventError
-{
-    EventType type;
-    Error code;
+    target_computation_err,
+    unknown_state,
 };
 
 // data types for command events
@@ -38,63 +25,33 @@ enum class Command
     start_joint_positiom,
     done,
 };
-struct EventCommand
-{
-    EventType type;
-    Command command;
-};
-
-
-// data type for a single event
-union Event
-{
-    EventType       type;
-    EventError      error;
-    EventCommand    command;
-};
 
 
 // Class to manage events
 class EventsManager
 {
 public:
-    std::vector<Event> events;
-    bool has_error = false;
+    std::vector<Error> errors;
+    std::vector<Command> commands;
 
     // adding events
-    void add(Error error);
-    void add(Command command);
+    inline void add(Error error) {errors.push_back(error);}
+    inline void add(Command command) {commands.push_back(command);}
+
 
     // searching operators
+    inline bool has_error() {return !errors.empty();}
     inline bool operator==(const Command& cmd);
 
     // mirror some vector functions
-    inline bool empty() {return events.empty();}
-    inline std::vector<Event>::iterator begin() {return events.begin();}
-    inline std::vector<Event>::iterator end() {return events.end();}
-    inline void clear() {events.clear(); has_error = false;}
+    inline void clear() {commands.clear();}
+    inline void clear_errors() {errors.clear();}
 };
 
 
-
-/** Check the given event if it is the given command
- *
- * @param e -> event to check
- * @param cmd -> the command to compare against
- */
-inline bool operator==(const Event& e, const Command& cmd)
-{
-    return e.type == EventType::command && e.command.command == cmd;
-}
-
-/** Check the given command is in ANY of the events currently logged
- *
- * @param cmd -> the command to find
- */
 inline bool EventsManager::operator==(const Command& cmd)
 {
-
-    for (auto& event : events)
+    for (auto& event : commands)
         if (event == cmd)
             return true;
     return false;

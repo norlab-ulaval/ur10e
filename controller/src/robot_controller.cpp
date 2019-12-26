@@ -40,7 +40,7 @@ void RobotController::control(const ros::TimerEvent&)
     const auto call_trg  = ros::service::call<Trigger>;
     const auto call_load = ros::service::call<Load>;
 
-    if (events.has_error)
+    if (events.has_error())
     {
         state = State::error;
     }
@@ -247,11 +247,10 @@ void RobotController::control(const ros::TimerEvent&)
 
     case State::error:
     {
-        // todo: store errors
         traj_client->cancelAllGoals();
-        if (events == Command::reset && events.has_error == false)
+        if (events == Command::reset)
         {
-            // todo: clear errors when the storing mechanism is implmented
+            events.clear_errors();
             state = State::standstill;
             ROS_INFO("Errors reset, returning to standstill...");
         }
@@ -262,6 +261,7 @@ void RobotController::control(const ros::TimerEvent&)
     default:
     {
         state = State::error;
+        events.add(Error::unknown_state);
         ROS_ERROR("The internal state changed to an unknown state. State %d is not handled.", state);
     }
     } // switch (state)
@@ -269,7 +269,7 @@ void RobotController::control(const ros::TimerEvent&)
 
 
     // There may have been new errors
-    if (events.has_error)
+    if (events.has_error())
     {
         state = State::error;
     }
