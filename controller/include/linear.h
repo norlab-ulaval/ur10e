@@ -13,7 +13,8 @@ struct Mat3;
 struct Mat6;
 struct Mat12x6; // used in the inverse kinematics of the ur10e (jacobian)
 
-
+const double pi = 3.14159265359;
+const double pi_2 = 1.57079632679;
 
 inline bool small(double v, double eps = 1e-6) {return v > -eps && v < eps;}
 
@@ -70,7 +71,9 @@ struct Vec6
     Vec6(std::vector<double> rhs);
     void operator=(std::initializer_list<double> rhs);
     void operator+=(const Vec6& rhs);
-    Vec6 operator+(const Vec6& rhs);
+    Vec6 operator+(const Vec6& rhs) const;
+    void operator-=(const Vec6& rhs);
+    Vec6 operator-(const Vec6& rhs) const;
     Vec3 first3();
     Vec3 last3();
 
@@ -241,6 +244,15 @@ inline double det(Mat3& M)
     result -= M.b*(M.d*M.i - M.g*M.f);
     result += M.c*(M.d*M.h - M.e*M.g);
     return result;
+}
+inline bool small(const std::vector<double>& v)
+{
+    double res = 0.0;
+    for (auto x:v)
+    {
+        res += x*x;
+    }
+    return small(res);
 }
 inline bool small(const Vec6& v)
 {

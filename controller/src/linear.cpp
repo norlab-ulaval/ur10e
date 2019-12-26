@@ -166,10 +166,25 @@ void Vec6::operator+=(const Vec6& rhs)
     data[4] += rhs[4];
     data[5] += rhs[5];
 }
-Vec6 Vec6::operator+(const Vec6& rhs)
+void Vec6::operator-=(const Vec6& rhs)
+{
+    j1 -= rhs.j1;
+    j2 -= rhs.j2;
+    j3 -= rhs.j3;
+    j4 -= rhs.j4;
+    j5 -= rhs.j5;
+    j6 -= rhs.j6;
+}
+Vec6 Vec6::operator+(const Vec6& rhs) const
 {
     auto result = *this;
     result += rhs;
+    return result;
+}
+Vec6 Vec6::operator-(const Vec6& rhs) const
+{
+    auto result = *this;
+    result -= rhs;
     return result;
 }
 void Vec6::operator*=(double rhs)

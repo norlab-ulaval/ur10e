@@ -7,42 +7,32 @@
 
 
 
-
-
+using RC = RobotController;
 int main(int argc, char** argv)
 {
     ros::init(argc, argv, "UR10e_controller");
     ros::NodeHandle node;
-    RobotController robot_controller;
+    RC rc;
 
-    //--- advertise to topics
-    robot_controller.command_pub = node.advertise<MsgTrajGoal>(
-            "scaled_pos_traj_controller/follow_joint_trajectory/goal", 1);
-    robot_controller.cancel_pub = node.advertise<MsgTrajCancel>(
-            "scaled_pos_traj_controller/follow_joint_trajectory/cancel", 1);
-    robot_controller.state_pub = node.advertise<std_msgs::UInt16>(
-            "ur10e/state", 1);
+    //--- advertise services
+    auto ss2 = node.advertiseService("ur10e/stop_traj", &RC::stop_trajectory,   &rc);
+    auto ss3 = node.advertiseService("ur10e/start_vel", &RC::start_velocity,    &rc);
+    auto ss4 = node.advertiseService("ur10e/start_pos", &RC::start_position,    &rc);
+    auto ss5 = node.advertiseService("ur10e/init",      &RC::init,              &rc);
+    auto ss6 = node.advertiseService("ur10e/home",      &RC::start_home,        &rc);
+
+    //--- advertise topics
+    rc.state_pub = node.advertise<State>("ur10e/state", 0);
 
     //--- subscribe to topics
-    //     node.subscribe<MsgTrajState>(
-    robot_controller.joints_sub = node.subscribe<MsgTrajState>(
-            "/scaled_pos_traj_controller/state", 10, &RobotController::state_callback,
-            &robot_controller);
+    auto sub1 = node.subscribe<TrajState>("/scaled_pos_traj_controller/state", 0, &RC::state_callback,
+            &rc);
+    auto sub2 = node.subscribe<Joy>("joy", 0, &RC::joy_callback, &rc);
+    auto sub3 = node.subscribe<RobotMode>("/ur_hardware_interface/robot_mode", 0,
+            &RC::robot_mode_callback, &rc);
 
-    robot_controller.joy_sub = node.subscribe<MsgJoy>(
-            "joy", 10, &RobotController::joy_callback, &robot_controller);
-
-    robot_controller.start_vel_sub = node.subscribe<std_msgs::Empty>(
-            "ur10e/start_vel", 1, &RobotController::start_vel_callback, &robot_controller);
-
-    robot_controller.stop_sub = node.subscribe<std_msgs::Empty>(
-            "ur10e/stop", 1, &RobotController::stop_callback, &robot_controller);
-
-
-    //     Subscriber reset_sub;
-    //     Subscriber stop_sub;
-    //     Subscriber start_vel_sub;
-    //     Subscriber start_pos_sub;
+    //--- create timer for main control loop
+    ros::Timer timer = node.createTimer(ros::Duration(0.1), &RC::control, &rc);
 
     // todo: should this be multi-threaded?
     ros::spin();

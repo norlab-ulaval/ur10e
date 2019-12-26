@@ -25,11 +25,3 @@ void EventsManager::add(Error error)
     event.error.code = error;
     events.push_back(event);
 }
-void EventsManager::add(Warning warning)
-{
-    has_warning = true;
-    Event event;
-    event.type = EventType::warning;
-    event.warning.code = warning;
-    events.push_back(event);
-}

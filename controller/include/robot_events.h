@@ -16,7 +16,9 @@ enum class EventType
 // data types for error events
 enum class Error
 {
-
+    none,
+    traj_action_err,
+    target_computation_err
 };
 struct EventError
 {
@@ -24,23 +26,17 @@ struct EventError
     Error code;
 };
 
-enum class Warning
-{
-    ik_not_converge,
-};
-struct EventWarning
-{
-    EventType type;
-    Warning code;
-};
-
 // data types for command events
 enum class Command
 {
     none,
+    init,
     stop,
     reset,
+    start_home,
     start_cart_velocity,
+    start_joint_positiom,
+    done,
 };
 struct EventCommand
 {
@@ -54,7 +50,6 @@ union Event
 {
     EventType       type;
     EventError      error;
-    EventWarning    warning;
     EventCommand    command;
 };
 
@@ -65,11 +60,9 @@ class EventsManager
 public:
     std::vector<Event> events;
     bool has_error = false;
-    bool has_warning = false;
 
     // adding events
     void add(Error error);
-    void add(Warning warning);
     void add(Command command);
 
     // searching operators
@@ -79,7 +72,7 @@ public:
     inline bool empty() {return events.empty();}
     inline std::vector<Event>::iterator begin() {return events.begin();}
     inline std::vector<Event>::iterator end() {return events.end();}
-    inline void clear() {events.clear(); has_error = false; has_warning = false;}
+    inline void clear() {events.clear(); has_error = false;}
 };
 
 
@@ -100,6 +93,7 @@ inline bool operator==(const Event& e, const Command& cmd)
  */
 inline bool EventsManager::operator==(const Command& cmd)
 {
+
     for (auto& event : events)
         if (event == cmd)
             return true;

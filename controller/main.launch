@@ -1,4 +1,5 @@
 <launch>
     <node pkg="ur10e" type="ur10e" name="controller" />
+    <node pkg="ur10e_gui" type="run.sh" name="gui" />
 
 </launch>
