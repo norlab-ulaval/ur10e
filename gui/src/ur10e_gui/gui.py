@@ -17,6 +17,7 @@ from ur10e_messages.msg import State
 stop_trajectory = rospy.ServiceProxy('ur10e/stop_traj', Empty)
 start_velocity = rospy.ServiceProxy('ur10e/start_vel', Empty)
 start_position = rospy.ServiceProxy('ur10e/start_pos', Empty)
+reset_errors = rospy.ServiceProxy('ur10e/reset_errors', Empty)
 init = rospy.ServiceProxy('ur10e/init', Empty)
 home = rospy.ServiceProxy('ur10e/home', Empty)
 
@@ -42,6 +43,8 @@ class Gui(Plugin):
         self._widget.pb_velocity.clicked.connect(self.velocity_pressed)
         self._widget.pb_position.clicked.connect(self.position_pressed)
         self._widget.pb_stop.clicked.connect(self.stop_pressed)
+        self._widget.pb_error.clicked.connect(self.error_pressed)
+        self._widget.pb_reset.clicked.connect(self.reset_pressed)
         self._widget.pb_back_vel.clicked.connect(self.back)
         self._widget.pb_back_pos.clicked.connect(self.back)
         self._widget.pb_back_home.clicked.connect(self.back)
@@ -156,6 +159,18 @@ class Gui(Plugin):
                 start_position()
             except Exception as err:
                 rospy.logwarn('Service not active.')
+
+    @Slot()
+    def error_pressed(self):
+        if self.state == State.error:
+            self._widget.tab.setCurrentIndex(4)
+
+    @Slot()
+    def reset_pressed(self):
+        try:
+            reset_errors()
+        except Exception:
+            rospy.logwarn('Service not active.')
 
     @Slot()
     def stop_pressed(self):

@@ -78,6 +78,9 @@ void RobotController::control(const ros::TimerEvent&)
         }
         else if (events == Command::start_home)
         {
+            Vec6 target = {0, -pi_2, pi_2, 0, 0, 0};
+            Vec6 max_vel = {0.5, 0.5, 0.5, 0.5, 0.5, 0.5};
+            replace_target(target, max_vel);
             state = State::homing;
             ROS_INFO("Homing...");
         }
@@ -85,13 +88,18 @@ void RobotController::control(const ros::TimerEvent&)
     }
 
 
-    case State::cart_velocity:
+    case State::homing:
     {
-        velocity_control();
+        position_control();
         if (events == Command::stop)
         {
             state = State::stopping;
             ROS_INFO("Stopping...");
+        }
+        else if (events == Command::done)
+        {
+            state = State::standstill;
+            ROS_INFO("Done.");
         }
         break;
     }
@@ -109,18 +117,13 @@ void RobotController::control(const ros::TimerEvent&)
     }
 
 
-    case State::homing:
+    case State::cart_velocity:
     {
-        homing_control();
+        velocity_control();
         if (events == Command::stop)
         {
             state = State::stopping;
             ROS_INFO("Stopping...");
-        }
-        else if (events == Command::done)
-        {
-            state = State::standstill;
-            ROS_INFO("Done.");
         }
         break;
     }
@@ -144,8 +147,8 @@ void RobotController::control(const ros::TimerEvent&)
         if (events == Command::reset)
         {
             events.clear_errors();
-            state = State::standstill;
-            ROS_INFO("Errors reset, returning to standstill...");
+            state = State::uninitialized;
+            ROS_INFO("Errors reset, returning to uninitialized...");
         }
         break;
     }
@@ -295,59 +298,6 @@ void RobotController::init_control()
     }
     }
 }
-void RobotController::homing_control()
-{
-    auto goal = traj_client->getState();
-    if (goal == goal.LOST)
-    {
-        // todo: validate!!
-        Vec6 target = {0, -pi_2, pi_2, 0, 0, 0};
-        Vec6 delta_th = target - cur_joint_pos;
-        double time = 0.0;
-        const Vec6 max_speed = {0.2, 0.2, 0.2, 0.2, 0.2, 0.2};
-        const Vec6 max_accel = {0.2, 0.2, 0.2, 0.2, 0.2, 0.2};
-
-        for (uint i = 0; i < 6; i++)
-        {
-            double T = 0.0;
-            if (delta_th[i] >= max_speed[i]*max_speed[i]/max_accel[i])
-            {
-                T = max_speed[i]/max_accel[i] + delta_th[i]/max_speed[i];
-            }
-            else
-            {
-                T = sqrt(4.0*max_accel[i]*delta_th[i]);
-            }
-            time = T>time ? T : time;
-        }
-
-        if (time < 0)
-        {
-            events.add(Error::target_computation_err);
-            ROS_ERROR("Error in homing computation, the computed time is negative. Time: %f", time);
-            return;
-        }
-
-        validate_and_send(target, time);
-    }
-    else if (goal == goal.ACTIVE || goal == goal.PENDING)
-    {}
-    else if (goal == goal.PREEMPTED
-        || goal == goal.ABORTED
-        || goal == goal.RECALLED
-        || goal == goal.REJECTED)
-    {
-        events.add(Error::traj_action_err);
-
-        auto err = traj_client->getResult();
-        ROS_ERROR("The trajectory action encountered an error: %s.", err->error_string.c_str());
-    }
-    else if (goal == goal.SUCCEEDED)
-    {
-        // todo: Stop tracking goal?
-        events.add(Command::done);
-    }
-}
 void RobotController::velocity_control()
 {
     // get current cartesian position and orientation
@@ -412,16 +362,64 @@ void RobotController::velocity_control()
 }
 void RobotController::position_control()
 {
-    // read current position and velocity
+    auto s = traj_client->getState();
+    if (s == s.LOST)
+    {
+        // do nothing
+    }
+    else if (s == s.ACTIVE || s == s.PENDING)
+    {
+        // do nothing
+    }
+    else if (s == s.PREEMPTED || s == s.ABORTED || s == s.RECALLED || s == s.REJECTED)
+    {
+        events.add(Error::traj_action_err);
+        auto err = traj_client->getResult();
+        ROS_ERROR("The trajectory action encountered an error: %s.", err->error_string.c_str());
+    }
+    else if (s == s.SUCCEEDED)
+    {
+        events.add(Command::done);
+    }
+}
 
-    Vec6 q = cur_joint_pos;
-    Vec6 qd = joints_msg->actual.velocities;
 
-    // read goal position and max velocity
-    // Vec6 goal = ;
 
-    // compute next position
-    // send next position
+//----------------------------
+// Action server functions
+//----------------------------
+void RobotController::replace_target(Vec6& q, Vec6& v)
+{
+    auto s = traj_client->getState();
+    if (s == s.ACTIVE || s==s.PENDING)
+    {
+        traj_client->cancelGoal();
+    }
+
+    Vec6 disp = q - cur_joint_pos;
+    double time = 0.0;
+
+    // note: this presumes a constant velocity and negligeable accel time!!!
+    for (uint i = 0; i < 6; i++)
+    {
+        double T = 0.0;
+        T = disp[i] / v[i];
+        time = T>time ? T : time;
+    }
+
+    if (time < 0)
+    {
+        events.add(Error::target_computation_err);
+        ROS_ERROR("Error in homing computation, the computed time is negative. Time: %f", time);
+    }
+    else
+    {
+        validate_and_send(q, time);
+    }
+}
+void RobotController::add_target(Vec6& q, double T)
+{
+    validate_and_send(q, T);
 }
 
 
@@ -480,7 +478,11 @@ bool RobotController::start_home(Empty::Request&, Empty::Response&)
     events.add(Command::start_home);
     return true;
 }
-
+bool RobotController::reset_errors(Empty::Request&, Empty::Response&)
+{
+    events.add(Command::reset);
+    return true;
+}
 
 
 //----------------------------

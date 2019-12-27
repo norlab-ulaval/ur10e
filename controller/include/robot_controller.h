@@ -68,12 +68,15 @@ public:
     RobotController();
     ~RobotController();
 
-    //--- control functions
+    //--- state machine functions
     void control(const ros::TimerEvent&);
     void init_control();
-    void homing_control();
     void velocity_control();
     void position_control();
+
+    // cancel all targets and replace with the given one
+    void replace_target(Vec6& target, Vec6& max_vel);
+    void add_target(Vec6& target, double time_from_now);
 
     //--- utility functions
     bool validate_and_send(Vec6& joints);
@@ -90,6 +93,7 @@ public:
     bool start_velocity(Empty::Request&, Empty::Response&);
     bool start_home(Empty::Request&, Empty::Response&);
     bool start_position(Empty::Request&, Empty::Response&);
+    bool reset_errors(Empty::Request&, Empty::Response&);
 };
 
 void print(const char* prefix, const Vec3& v);

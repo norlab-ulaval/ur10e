@@ -1,5 +1,5 @@
 <launch>
     <node pkg="ur10e" type="ur10e" name="controller" />
     <node pkg="ur10e_gui" type="run.sh" name="gui" />
-
+    <node pkg="rqt_console" type="rqt_console" name="rqt_console" />
 </launch>
