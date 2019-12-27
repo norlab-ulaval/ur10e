@@ -35,10 +35,6 @@ void RobotController::control(const ros::TimerEvent&)
     // {
     //     print("Warning, the mode of the robot is still unknown.");
     // }
-    using Trigger = std_srvs::Trigger;
-    using Load = ur_dashboard_msgs::Load;
-    const auto call_trg  = ros::service::call<Trigger>;
-    const auto call_load = ros::service::call<Load>;
 
     if (events.has_error())
     {
@@ -50,121 +46,18 @@ void RobotController::control(const ros::TimerEvent&)
     case State::uninitialized:
     {
         if (events == Command::init)
-            state = State::starting_controller;
+            state = State::initializing;
         break;
     }
 
 
-    case State::starting_controller:
+    case State::initializing:
     {
-        if (robot_mode < ur_dashboard_msgs::RobotMode::POWER_OFF)
+        init_control();
+        if (events == Command::done)
         {
-            state = State::error;
-            ROS_ERROR("The controller should be powered on but it's not. state: %u, RobotMode: %d",
-                state, robot_mode);
-        }
-        else if (robot_mode >= ur_dashboard_msgs::RobotMode::POWER_ON)
-        {
-            state = State::releasing_brakes;
-        }
-        else
-        {
-            Trigger srv;
-            call_trg("/ur_hardware_interface/dashboard/power_on", srv);
-            ROS_INFO("Starting the controller...");
-        }
-        break;
-    }
-
-
-    case State::releasing_brakes:
-    {
-        if (robot_mode < ur_dashboard_msgs::RobotMode::POWER_ON)
-        {
-            state = State::error;
-            ROS_ERROR("The controller should be powered on but it's not. state: %u, RobotMode: %d",
-                state, robot_mode);
-        }
-        else if (robot_mode >= ur_dashboard_msgs::RobotMode::RUNNING)
-        {
-            state = State::loading_program;
-        }
-        else
-        {
-            Trigger srv;
-            call_trg("ur_hardware_interface/dashboard/brake_release", srv);
-            ROS_INFO("Releasing brakes...");
-        }
-        break;
-    }
-
-
-    case State::loading_program:
-    {
-        if (robot_mode < ur_dashboard_msgs::RobotMode::RUNNING
-            && robot_mode != ur_dashboard_msgs::RobotMode::BACKDRIVE)
-        {
-            state = State::error;
-            ROS_ERROR("The robot is not in the correct mode to load the program. RobotMode: %d", robot_mode);
-        }
-        else
-        {
-            Load srv;
-            srv.request.filename = "external.urp";
-            call_load("ur_hardware_interface/dashboard/load_program", srv);
-            ROS_INFO("Loading external.urp program...");
-            if (srv.response.success)
-            {
-                state = State::playing_program;
-            }
-            else
-            {
-                state = State::error;
-                ROS_ERROR("Error loading program. Reply: %s.", srv.response.answer.c_str());
-            }
-        }
-        break;
-    }
-
-
-    case State::playing_program:
-    {
-        if (robot_mode < ur_dashboard_msgs::RobotMode::RUNNING
-            && robot_mode != ur_dashboard_msgs::RobotMode::BACKDRIVE)
-        {
-            state = State::error;
-            ROS_ERROR("The robot is not in the correct mode to play the program. RobotMode: %d.", robot_mode);
-        }
-        else
-        {
-            // get the program state
-            GetProgramState state_srv;
-            ros::service::call<GetProgramState>(
-                "ur_hardware_interface/dashboard/program_state",
-                state_srv
-            );
-            if (state_srv.response.state.state == state_srv.response.state.PLAYING
-                && state_srv.response.program_name == "external.urp")
-            {
-                state = State::standstill;
-                ROS_INFO("Program external.urp already running.");
-            }
-            else
-            {
-                Trigger srv;
-                call_trg("ur_hardware_interface/dashboard/play", srv);
-                ROS_INFO("Playing external.urp program...");
-                if (srv.response.success)
-                {
-                    state = State::standstill;
-                    ROS_INFO("Ready.");
-                }
-                else
-                {
-                    state = State::error;
-                    ROS_ERROR("Error playing program. Reply: %s.", srv.response.message.c_str());
-                }
-            }
+            ROS_INFO("Done.");
+            state = State::standstill;
         }
         break;
     }
@@ -268,15 +161,139 @@ void RobotController::control(const ros::TimerEvent&)
 
 
 
-    // There may have been new errors
-    if (events.has_error())
-    {
-        state = State::error;
-    }
     events.clear();
 
     state_msg.state = state;
     state_pub.publish(state_msg);
+}
+void RobotController::init_control()
+{
+    enum class ST
+    {
+        power,
+        brakes,
+        load,
+        play,
+    };
+    using std_srvs::Trigger;
+    using ur_dashboard_msgs::Load;
+    using ur_dashboard_msgs::RobotMode;
+    const auto call_trg  = ros::service::call<Trigger>;
+    const auto call_load = ros::service::call<Load>;
+    const auto call_state = ros::service::call<GetProgramState>;
+
+
+    static ST st = ST::power;
+    switch (st)
+    {
+    // power up the robot
+    case ST::power:
+    {
+        if (robot_mode < RobotMode::POWER_OFF)
+        {
+            events.add(Error::robot_wrong_mode);
+            ROS_ERROR("The robot should be ready but it's not. RobotMode: %d", robot_mode);
+            st = ST::power;
+        }
+        else if (robot_mode >= RobotMode::IDLE)
+        {
+            st = ST::brakes;
+        }
+        else
+        {
+            Trigger srv;
+            call_trg("/ur_hardware_interface/dashboard/power_on", srv);
+            ROS_INFO("Powering up...");
+        }
+        break;
+    }
+
+    // release the brakes
+    case ST::brakes:
+    {
+        if (robot_mode < RobotMode::IDLE)
+        {
+            events.add(Error::robot_wrong_mode);
+            ROS_ERROR("The robot should be powered on, but it's not. Mode: %d", robot_mode);
+            st = ST::power;
+        }
+        else if (robot_mode >= RobotMode::RUNNING)
+        {
+            st = ST::load;
+        }
+        else
+        {
+            Trigger srv;
+            call_trg("/ur_hardware_interface/dashboard/brake_release", srv);
+            ROS_INFO("Releasing brakes...");
+        }
+        break;
+    }
+    case ST::load:
+    {
+        if (robot_mode != RobotMode::RUNNING)
+        {
+            events.add(Error::robot_wrong_mode);
+            ROS_ERROR("The robot is not in the correct mode to load the program. RobotMode: %d", robot_mode);
+            st = ST::power;
+        }
+        else
+        {
+            Load srv;
+            srv.request.filename = "external.urp";
+            call_load("ur_hardware_interface/dashboard/load_program", srv);
+            ROS_INFO("Loading external.urp program...");
+            if (srv.response.success)
+            {
+                st = ST::play;
+            }
+            else
+            {
+                events.add(Error::program_load);
+                ROS_ERROR("Error loading program. Reply: %s.", srv.response.answer.c_str());
+                st = ST::power;
+            }
+        }
+        break;
+    }
+    case ST::play:
+    {
+        if (robot_mode < RobotMode::RUNNING && robot_mode != RobotMode::BACKDRIVE)
+        {
+            events.add(Error::robot_wrong_mode);
+            ROS_ERROR("The robot is not in the correct mode to play the program. RobotMode: %d", robot_mode);
+            st = ST::power;
+        }
+        else
+        {
+            // get the program state
+            GetProgramState state_srv;
+            call_state("ur_hardware_interface/dashboard/program_state", state_srv);
+            ROS_INFO("Playing external.urp program...");
+            if (state_srv.response.state.state == state_srv.response.state.PLAYING
+                && state_srv.response.program_name == "external.urp")
+            {
+                events.add(Command::done);
+            }
+            else
+            {
+                Trigger srv;
+                call_trg("ur_hardware_interface/dashboard/play", srv);
+                if (srv.response.success)
+                {
+                    events.add(Command::done);
+                }
+                else
+                {
+                    events.add(Error::program_play);
+                    ROS_ERROR("Error playing program. Reply: %s.", srv.response.message.c_str());
+                }
+            }
+            st = ST::power;
+        }
+        break;
+    }
+    }
 }
 void RobotController::homing_control()
 {

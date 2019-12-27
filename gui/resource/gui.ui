@@ -462,7 +462,7 @@
     <widget class="QPushButton" name="pb_stand">
      <property name="geometry">
       <rect>
-       <x>220</x>
+       <x>330</x>
        <y>110</y>
        <width>81</width>
        <height>61</height>
@@ -481,8 +481,8 @@
     <widget class="QPushButton" name="pb_velocity">
      <property name="geometry">
       <rect>
-       <x>340</x>
-       <y>40</y>
+       <x>450</x>
+       <y>110</y>
        <width>81</width>
        <height>61</height>
       </rect>
@@ -500,8 +500,8 @@
     <widget class="QPushButton" name="pb_position">
      <property name="geometry">
       <rect>
-       <x>340</x>
-       <y>110</y>
+       <x>450</x>
+       <y>180</y>
        <width>81</width>
        <height>61</height>
       </rect>
@@ -519,7 +519,7 @@
     <widget class="QPushButton" name="pb_stop">
      <property name="geometry">
       <rect>
-       <x>530</x>
+       <x>570</x>
        <y>110</y>
        <width>81</width>
        <height>61</height>
@@ -538,8 +538,8 @@
     <widget class="QPushButton" name="pb_error">
      <property name="geometry">
       <rect>
-       <x>220</x>
-       <y>250</y>
+       <x>570</x>
+       <y>180</y>
        <width>81</width>
        <height>61</height>
       </rect>
@@ -557,8 +557,8 @@
     <widget class="QPushButton" name="pb_init">
      <property name="geometry">
       <rect>
-       <x>80</x>
-       <y>40</y>
+       <x>210</x>
+       <y>110</y>
        <width>81</width>
        <height>61</height>
       </rect>
@@ -576,14 +576,33 @@
     <widget class="QPushButton" name="pb_home">
      <property name="geometry">
       <rect>
-       <x>80</x>
-       <y>110</y>
+       <x>450</x>
+       <y>40</y>
        <width>81</width>
        <height>61</height>
       </rect>
      </property>
      <property name="text">
       <string>Home</string>
+     </property>
+     <property name="default">
+      <bool>false</bool>
+     </property>
+     <property name="flat">
+      <bool>false</bool>
+     </property>
+    </widget>
+    <widget class="QPushButton" name="pb_start">
+     <property name="geometry">
+      <rect>
+       <x>90</x>
+       <y>110</y>
+       <width>81</width>
+       <height>61</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>Start</string>
      </property>
      <property name="default">
       <bool>false</bool>

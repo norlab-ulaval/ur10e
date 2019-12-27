@@ -75,17 +75,24 @@ class Gui(Plugin):
         self._widget.pb_init.setStyleSheet("background-color: white")
         self._widget.pb_home.setEnabled(False)
         self._widget.pb_home.setStyleSheet("background-color: white")
+        self._widget.pb_start.setEnabled(False)
+        self._widget.pb_start.setStyleSheet("background-color: white")
 
         if self.state == State.uninitialized:
             self._widget.pb_init.setEnabled(True)
-            self._widget.pb_init.setStyleSheet("background-color:rgb(114, 159, 207)")
+            self._widget.pb_start.setStyleSheet(
+                "background-color:rgb(114, 159, 207); color: white;"
+            )
+
+        if self.state == State.initializing:
+            self._widget.pb_init.setEnabled(False)
+            self._widget.pb_init.setStyleSheet("background-color:rgb(114, 159, 207); color: white;")
 
         elif self.state == State.standstill:
             self._widget.pb_position.setEnabled(True)
-            self._widget.pb_stand.setEnabled(True)
             self._widget.pb_velocity.setEnabled(True)
             self._widget.pb_home.setEnabled(True)
-            self._widget.pb_stand.setStyleSheet("background-color:rgb(114, 159, 207)")
+            self._widget.pb_stand.setStyleSheet("background-color:rgb(114, 159, 207); color:white")
 
         elif self.state == State.cart_velocity:
             self._widget.pb_velocity.setEnabled(True)

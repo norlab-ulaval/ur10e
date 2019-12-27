@@ -70,6 +70,7 @@ public:
 
     //--- control functions
     void control(const ros::TimerEvent&);
+    void init_control();
     void homing_control();
     void velocity_control();
     void position_control();
