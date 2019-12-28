@@ -1,9 +1,9 @@
 #include <ros/ros.h>
 
 
-#include "linear.h"
-#include "robot_controller.h"
-#include "robot_model.h"
+#include "ur10e_linear.h"
+#include "ur10e_controller.h"
+#include "ur10e_model.h"
 
 
 

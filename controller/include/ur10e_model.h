@@ -1,9 +1,9 @@
 #pragma once
 
-#include "linear.h"
+#include "ur10e_linear.h"
 #include <ros/ros.h>
 
-struct RobotModel
+struct ur10e
 {
     // dh parameters (updated after the calibration)
     Vec6 dh_a = {0, -0.6127, -0.57155, 0, 0, 0};

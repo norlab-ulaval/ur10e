@@ -1,4 +1,4 @@
-#include "robot_controller.h"
+#include "ur10e_controller.h"
 
 
 
@@ -7,7 +7,7 @@
 //----------------------------
 RobotController::RobotController()
 {
-    robot_model.calibrate();
+    robot.calibrate();
     state = State::uninitialized;
     traj_client = new TrajClient("scaled_pos_traj_controller/follow_joint_trajectory", false);
     traj_goal.trajectory.points.resize(1);
@@ -67,7 +67,7 @@ void RobotController::control(const ros::TimerEvent&)
     {
         if (events == Command::start_cart_velocity)
         {
-            robot_model.fk(cur_joint_pos, cur_cart_pos_goal, cur_cart_rot_goal);
+            robot.fk(cur_joint_pos, cur_cart_pos_goal, cur_cart_rot_goal);
             state = State::cart_velocity;
             ROS_INFO("Joystick...");
         }
@@ -346,7 +346,7 @@ void RobotController::velocity_control()
 
     // compute the associated joint positions (inverse kinematics)
     Vec6 joint_goal = cur_joint_pos;
-    if (robot_model.ik(next_pos, next_rot, cur_joint_pos, joint_goal))
+    if (robot.ik(next_pos, next_rot, cur_joint_pos, joint_goal))
     {
         cur_cart_pos_goal = next_pos;
         cur_cart_rot_goal = next_rot;

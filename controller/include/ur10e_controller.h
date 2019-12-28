@@ -17,9 +17,9 @@
 #include <ur_dashboard_msgs/Load.h>
 #include <ur_dashboard_msgs/GetProgramState.h>
 
-#include "robot_model.h"
-#include "robot_events.h"
-#include "linear.h"
+#include "ur10e_model.h"
+#include "ur10e_events.h"
+#include "ur10e_linear.h"
 
 const double angular_speed = 1.0; // rad/s
 const double linear_speed = 0.2;  // m/s
@@ -47,7 +47,7 @@ public:
     State state_msg;
 
     EventsManager events;
-    RobotModel robot_model;
+    ur10e robot;
     int robot_mode = -100;
 
     // ROS messaging

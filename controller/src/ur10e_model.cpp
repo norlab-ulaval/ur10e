@@ -1,10 +1,10 @@
-#include "robot_model.h"
+#include "ur10e_model.h"
 #include <Eigen/Cholesky>
 
 
 
 
-void RobotModel::calibrate()
+void ur10e::calibrate()
 {
     Vec6 delta_theta =
     {
@@ -55,7 +55,7 @@ void RobotModel::calibrate()
 
     is_calibrated = true;
 }
-void RobotModel::fk(Vec6& q, Vec3& pos_result, Mat3& Q_result)
+void ur10e::fk(Vec6& q, Vec3& pos_result, Mat3& Q_result)
 {
     Vec6 cos_th;
     Vec6 sin_th;
@@ -102,7 +102,7 @@ void RobotModel::fk(Vec6& q, Vec3& pos_result, Mat3& Q_result)
     r2 = r3 + P1 * a[1];
     pos_result = r2 + a[0];
 }
-bool RobotModel::ik(Vec3 tar_pos, Mat3 tar_rot, Vec6 guess_joint, Vec6 &result_joint)
+bool ur10e::ik(Vec3 tar_pos, Mat3 tar_rot, Vec6 guess_joint, Vec6 &result_joint)
 {
     Vec6 q = guess_joint;
     bool success = false;
