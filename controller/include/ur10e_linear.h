@@ -19,14 +19,11 @@ const double pi_2 = 1.57079632679;
 inline bool small(double v, double eps = 1e-6) {return v > -eps && v < eps;}
 
 // vector of 3 doubles (always initialized to zero)
-struct Vec3
-{
+struct Vec3 {
     // data
-    union
-    {
+    union {
         double data[3] = {0};
-        struct
-        {
+        struct {
             double x, y, z;
         };
     };
@@ -57,10 +54,8 @@ struct Vec3
 };
 
 // vector of 6 doubles (always initialized to zero)
-struct Vec6
-{
-    union
-    {
+struct Vec6 {
+    union {
         double data[6] = {0};
         struct {double x, y, z, wx, wy, wz;};
         struct {double j1, j2, j3, j4, j5, j6;};
@@ -87,8 +82,7 @@ struct Vec6
     double* end() {return std::end(data);}
 };
 
-struct Vec12
-{
+struct Vec12 {
     double data[12] = {0};
 
     Vec12() {};
@@ -101,13 +95,10 @@ struct Vec12
     double& operator[](uint index); // unsafe
 };
 
-struct Quat
-{
-    union
-    {
+struct Quat {
+    union {
         double data[4] = {1, 0, 0, 0};
-        struct
-        {
+        struct {
             double w; // cos(alpha/2)
             double x; // ux * sin(alpha/2)
             double y; // uy * sin(alpha/2)
@@ -129,10 +120,8 @@ struct Quat
 };
 
 // 3x3 matrix of doubles (always initialized to zero)
-struct Mat3
-{
-    union
-    {
+struct Mat3 {
+    union {
         double data[9] = {0};
         struct {double a,b,c,d,e,f,g,h,i;};
     };
@@ -168,8 +157,7 @@ Mat3 eye3();
 Mat3 eye3(double value);
 
 // 3x3 matrix of doubles (always initialized to zero)
-struct Mat6
-{
+struct Mat6 {
     //-- data members
     double data[36] = {0};
 
@@ -202,8 +190,7 @@ Mat6 eye6();
 Mat6 eye6(double value);
 
 // column major matrix used for the jacobian matrix
-struct Mat12x6
-{
+struct Mat12x6 {
     double data[72] = {0};
 
     double* begin() {return std::begin(data);}
@@ -215,55 +202,45 @@ struct Mat12x6
 
 
 
-inline double norm_squared(Vec3 v)
-{
+inline double norm_squared(Vec3 v) {
     return v.x * v.x + v.y * v.y + v.z * v.z;
 }
-inline double norm(Vec3 v)
-{
+inline double norm(Vec3 v) {
     return sqrt(norm_squared(v));
 }
-inline double norm_squared(Vec6 v)
-{
+inline double norm_squared(Vec6 v) {
     double result = 0.0;
     for (uint i = 0; i < 6; i++)
         result += v.data[i] * v.data[i];
     return result;
 }
-inline double norm_squared(Vec12 v)
-{
+inline double norm_squared(Vec12 v) {
     double result = 0.0;
     for (uint i = 0; i < 12; i++)
         result += v.data[i] * v.data[i];
     return result;
 }
-inline double det(Mat3& M)
-{
+inline double det(Mat3& M) {
     double result;
     result = M.a*(M.e*M.i - M.f*M.h);
     result -= M.b*(M.d*M.i - M.g*M.f);
     result += M.c*(M.d*M.h - M.e*M.g);
     return result;
 }
-inline bool small(const std::vector<double>& v)
-{
+inline bool small(const std::vector<double>& v) {
     double res = 0.0;
-    for (auto x:v)
-    {
+    for (auto x:v) {
         res += x*x;
     }
     return small(res);
 }
-inline bool small(const Vec6& v)
-{
+inline bool small(const Vec6& v) {
     return small(norm_squared(v));
 }
-inline bool small(const Vec3& v)
-{
+inline bool small(const Vec3& v) {
     return small(norm_squared(v));
 }
 
-inline bool is_unit(const Vec3& v)
-{
+inline bool is_unit(const Vec3& v) {
     return small(norm_squared(v) - 1.0);
 }

@@ -102,7 +102,7 @@ void ur10e::fk(Vec6& q, Vec3& pos_result, Mat3& Q_result)
     r2 = r3 + P1 * a[1];
     pos_result = r2 + a[0];
 }
-bool ur10e::ik(Vec3 tar_pos, Mat3 tar_rot, Vec6 guess_joint, Vec6 &result_joint)
+bool ur10e::ik(Vec3& tar_pos, Mat3& tar_rot, Vec6& guess_joint, Vec6 &result_joint)
 {
     Vec6 q = guess_joint;
     bool success = false;
@@ -232,7 +232,8 @@ bool ur10e::ik(Vec3 tar_pos, Mat3 tar_rot, Vec6 guess_joint, Vec6 &result_joint)
             - eigen_Jinv is NOT mapped
         */
         double Ek = 0.5 * norm_squared(f);
-        Hk = J.transpose_times_self() + eye6(Ek);
+        // todo: validate!
+        Hk = J.transpose_times_self() + eye6(Ek) + eye6(0.001);
         eigen_Jinv = eigen_Hk.ldlt().solve(eigen_J.transpose());
         eigen_q -= eigen_Jinv * eigen_f;
 

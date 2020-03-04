@@ -1,7 +1,15 @@
 <library path="src">
   <class name="ur10e_gui" type="ur10e_gui.gui.Gui" base_class_type="rqt_gui_py::Plugin">
     <description>
-      An example Python GUI plugin to create a great user interface.
+	    The main gui for interaction with the UR10e controller.
     </description>
+    <qtgui>
+      <group>
+        <label>UR10e</label>
+      </group>
+      <label>Gui</label>
+      <icon type="theme">applications-other</icon>
+      <statustip>The main gui for interaction with the UR10e controller.</statustip>
+    </qtgui>
   </class>
 </library>

@@ -6,19 +6,25 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>800</width>
-    <height>400</height>
+    <width>960</width>
+    <height>960</height>
    </rect>
   </property>
   <property name="windowTitle">
    <string>Form</string>
   </property>
-  <widget class="QTabWidget" name="tab">
+  <property name="autoFillBackground">
+   <bool>false</bool>
+  </property>
+  <property name="styleSheet">
+   <string notr="true">background:white</string>
+  </property>
+  <widget class="QTabWidget" name="main_tab">
    <property name="geometry">
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>800</width>
+     <width>960</width>
      <height>400</height>
     </rect>
    </property>
@@ -554,25 +560,6 @@
       <bool>false</bool>
      </property>
     </widget>
-    <widget class="QPushButton" name="pb_init">
-     <property name="geometry">
-      <rect>
-       <x>210</x>
-       <y>110</y>
-       <width>81</width>
-       <height>61</height>
-      </rect>
-     </property>
-     <property name="text">
-      <string>Init</string>
-     </property>
-     <property name="default">
-      <bool>false</bool>
-     </property>
-     <property name="flat">
-      <bool>false</bool>
-     </property>
-    </widget>
     <widget class="QPushButton" name="pb_home">
      <property name="geometry">
       <rect>
@@ -726,6 +713,24 @@
       <bool>false</bool>
      </property>
     </widget>
+   </widget>
+  </widget>
+  <widget class="QTabWidget" name="visualisation_tab">
+   <property name="geometry">
+    <rect>
+     <x>0</x>
+     <y>400</y>
+     <width>960</width>
+     <height>520</height>
+    </rect>
+   </property>
+   <property name="currentIndex">
+    <number>0</number>
+   </property>
+   <widget class="QWidget" name="tab_rviz">
+    <attribute name="title">
+     <string>Rviz</string>
+    </attribute>
    </widget>
   </widget>
  </widget>

@@ -5,7 +5,7 @@
 //----------------------------
 // object management
 //----------------------------
-RobotController::RobotController()
+Ur10eController::Ur10eController()
 {
     robot.calibrate();
     state = State::uninitialized;
@@ -19,7 +19,7 @@ RobotController::RobotController()
     traj_goal.trajectory.joint_names[4] = "wrist_2_joint";
     traj_goal.trajectory.joint_names[5] = "wrist_3_joint";
 }
-RobotController::~RobotController()
+Ur10eController::~Ur10eController()
 {
     delete traj_client;
 }
@@ -29,36 +29,31 @@ RobotController::~RobotController()
 //----------------------------
 // State machine functions
 //----------------------------
-void RobotController::control(const ros::TimerEvent&)
+void Ur10eController::control(const ros::TimerEvent&)
 {
-    // if (robot_mode == -100)
-    // {
-    //     print("Warning, the mode of the robot is still unknown.");
-    // }
+    assert_ur(
+        robot_mode >= RobotMode::BACKDRIVE
+        || state == State::uninitialized
+        || state == State::error,
+        "The robot is not running, but the controller state expects it to be."
+    );
 
     if (events.has_error())
     {
         state = State::error;
+        next_state = State::error;
     }
 
     switch(state)
     {
+
     case State::uninitialized:
     {
         if (events == Command::init)
-            state = State::initializing;
-        break;
-    }
-
-
-    case State::initializing:
-    {
-        init_control();
-        if (events == Command::done)
         {
-            ROS_INFO("Done.");
-            state = State::standstill;
+            next_state = State::standstill;
         }
+
         break;
     }
 
@@ -67,22 +62,15 @@ void RobotController::control(const ros::TimerEvent&)
     {
         if (events == Command::start_cart_velocity)
         {
-            robot.fk(cur_joint_pos, cur_cart_pos_goal, cur_cart_rot_goal);
-            state = State::cart_velocity;
-            ROS_INFO("Joystick...");
+            next_state = State::cart_velocity;
         }
         else if (events == Command::start_joint_positiom)
         {
-            state = State::joint_position;
-            ROS_INFO("Joint position...");
+            next_state = State::joint_position;
         }
         else if (events == Command::start_home)
         {
-            Vec6 target = {0, -pi_2, pi_2, 0, 0, 0};
-            Vec6 max_vel = {0.5, 0.5, 0.5, 0.5, 0.5, 0.5};
-            replace_target(target, max_vel);
-            state = State::homing;
-            ROS_INFO("Homing...");
+            next_state = State::homing;
         }
         break;
     }
@@ -90,16 +78,26 @@ void RobotController::control(const ros::TimerEvent&)
 
     case State::homing:
     {
+        assert_ur(robot_mode != RobotMode::BACKDRIVE, "Backdrive mode is not allowed while moving.");
+
+        if (state != last_state)
+        {
+            Vec6 target = {0, -pi_2, -pi_2, -pi_2, pi_2, 0};
+            Vec6 max_vel = {0.5, 0.5, 0.5, 0.5, 0.5, 0.5};
+            replace_target(target, max_vel);
+            ROS_INFO("Homing...");
+        }
+
         position_control();
+
         if (events == Command::stop)
         {
-            state = State::stopping;
-            ROS_INFO("Stopping...");
+            next_state = State::stopping;
         }
         else if (events == Command::done)
         {
-            state = State::standstill;
             ROS_INFO("Done.");
+            next_state = State::standstill;
         }
         break;
     }
@@ -107,11 +105,18 @@ void RobotController::control(const ros::TimerEvent&)
 
     case State::joint_position:
     {
+        assert_ur(robot_mode != RobotMode::BACKDRIVE, "Backdrive mode is not allowed while moving.");
+
+        if (state != last_state)
+        {
+            ROS_INFO("Joint position mode.");
+        }
+
         position_control();
+
         if (events == Command::stop)
         {
-            state = State::stopping;
-            ROS_INFO("Stopping...");
+            next_state = State::stopping;
         }
         break;
     }
@@ -119,11 +124,17 @@ void RobotController::control(const ros::TimerEvent&)
 
     case State::cart_velocity:
     {
+        if(state != last_state)
+        {
+            robot.fk(cur_joint_pos, cur_cart_pos_goal, cur_cart_rot_goal);
+            ROS_INFO("Joystick mode.");
+        }
+
         velocity_control();
+
         if (events == Command::stop)
         {
-            state = State::stopping;
-            ROS_INFO("Stopping...");
+            next_state = State::stopping;
         }
         break;
     }
@@ -131,11 +142,18 @@ void RobotController::control(const ros::TimerEvent&)
 
     case State::stopping:
     {
-        traj_client->cancelAllGoals();
+        assert_ur(robot_mode != RobotMode::BACKDRIVE, "Backdrive mode is not allowed while moving.");
+
+        if (state != last_state)
+        {
+            ROS_INFO("Stopping...");
+            traj_client->cancelAllGoals();
+        }
+
         if (small(joints_msg->actual.velocities))
         {
-            state = State::standstill;
             ROS_INFO("Done.");
+            next_state = State::standstill;
         }
         break;
     }
@@ -143,12 +161,16 @@ void RobotController::control(const ros::TimerEvent&)
 
     case State::error:
     {
-        traj_client->cancelAllGoals();
-        if (events == Command::reset)
+        if (state != last_state)
+        {
+            traj_client->cancelAllGoals();
+        }
+
+        if (events == Command::reset_errors)
         {
             events.clear_errors();
-            state = State::uninitialized;
-            ROS_INFO("Errors reset, returning to uninitialized...");
+            next_state = State::uninitialized;
+            ROS_INFO("Errors reset, returning to uninitialized.");
         }
         break;
     }
@@ -156,9 +178,9 @@ void RobotController::control(const ros::TimerEvent&)
 
     default:
     {
-        state = State::error;
+        next_state = State::error;
         events.add(Error::unknown_state);
-        ROS_ERROR("The internal state changed to an unknown state. State %d is not handled.", state);
+        ROS_ERROR("The controller state changed to an unknown state. State %d is not handled.", state);
     }
     } // switch (state)
 
@@ -166,139 +188,13 @@ void RobotController::control(const ros::TimerEvent&)
 
     events.clear();
 
+    last_state = state;
+    state = next_state;
+
     state_msg.state = state;
     state_pub.publish(state_msg);
 }
-void RobotController::init_control()
-{
-    enum class ST
-    {
-        power,
-        brakes,
-        load,
-        play,
-    };
-    using std_srvs::Trigger;
-    using ur_dashboard_msgs::Load;
-    using ur_dashboard_msgs::RobotMode;
-    const auto call_trg  = ros::service::call<Trigger>;
-    const auto call_load = ros::service::call<Load>;
-    const auto call_state = ros::service::call<GetProgramState>;
-
-
-    static ST st = ST::power;
-    switch (st)
-    {
-    // power up the robot
-    case ST::power:
-    {
-        if (robot_mode < RobotMode::POWER_OFF)
-        {
-            events.add(Error::robot_wrong_mode);
-            ROS_ERROR("The robot should be ready but it's not. RobotMode: %d", robot_mode);
-            st = ST::power;
-        }
-        else if (robot_mode >= RobotMode::IDLE)
-        {
-            st = ST::brakes;
-        }
-        else
-        {
-            Trigger srv;
-            call_trg("/ur_hardware_interface/dashboard/power_on", srv);
-            ROS_INFO("Powering up...");
-        }
-        break;
-    }
-
-    // release the brakes
-    case ST::brakes:
-    {
-        if (robot_mode < RobotMode::IDLE)
-        {
-            events.add(Error::robot_wrong_mode);
-            ROS_ERROR("The robot should be powered on, but it's not. Mode: %d", robot_mode);
-            st = ST::power;
-        }
-        else if (robot_mode >= RobotMode::RUNNING)
-        {
-            st = ST::load;
-        }
-        else
-        {
-            Trigger srv;
-            call_trg("/ur_hardware_interface/dashboard/brake_release", srv);
-            ROS_INFO("Releasing brakes...");
-        }
-        break;
-    }
-    case ST::load:
-    {
-        if (robot_mode != RobotMode::RUNNING)
-        {
-            events.add(Error::robot_wrong_mode);
-            ROS_ERROR("The robot is not in the correct mode to load the program. RobotMode: %d", robot_mode);
-            st = ST::power;
-        }
-        else
-        {
-            Load srv;
-            srv.request.filename = "external.urp";
-            call_load("ur_hardware_interface/dashboard/load_program", srv);
-            ROS_INFO("Loading external.urp program...");
-            if (srv.response.success)
-            {
-                st = ST::play;
-            }
-            else
-            {
-                events.add(Error::program_load);
-                ROS_ERROR("Error loading program. Reply: %s.", srv.response.answer.c_str());
-                st = ST::power;
-            }
-        }
-        break;
-    }
-    case ST::play:
-    {
-        if (robot_mode < RobotMode::RUNNING && robot_mode != RobotMode::BACKDRIVE)
-        {
-            events.add(Error::robot_wrong_mode);
-            ROS_ERROR("The robot is not in the correct mode to play the program. RobotMode: %d", robot_mode);
-            st = ST::power;
-        }
-        else
-        {
-            // get the program state
-            GetProgramState state_srv;
-            call_state("ur_hardware_interface/dashboard/program_state", state_srv);
-            ROS_INFO("Playing external.urp program...");
-            if (state_srv.response.state.state == state_srv.response.state.PLAYING
-                && state_srv.response.program_name == "external.urp")
-            {
-                events.add(Command::done);
-            }
-            else
-            {
-                Trigger srv;
-                call_trg("ur_hardware_interface/dashboard/play", srv);
-                if (srv.response.success)
-                {
-                    events.add(Command::done);
-                }
-                else
-                {
-                    events.add(Error::program_play);
-                    ROS_ERROR("Error playing program. Reply: %s.", srv.response.message.c_str());
-                }
-            }
-            st = ST::power;
-        }
-        break;
-    }
-    }
-}
-void RobotController::velocity_control()
+void Ur10eController::velocity_control()
 {
     // get current cartesian position and orientation
 
@@ -360,7 +256,7 @@ void RobotController::velocity_control()
     // send message
     validate_and_send(joint_goal);
 }
-void RobotController::position_control()
+void Ur10eController::position_control()
 {
     auto s = traj_client->getState();
     if (s == s.LOST)
@@ -388,7 +284,7 @@ void RobotController::position_control()
 //----------------------------
 // Action server functions
 //----------------------------
-void RobotController::replace_target(Vec6& q, Vec6& v)
+void Ur10eController::replace_target(Vec6& q, Vec6& v)
 {
     auto s = traj_client->getState();
     if (s == s.ACTIVE || s==s.PENDING)
@@ -417,7 +313,7 @@ void RobotController::replace_target(Vec6& q, Vec6& v)
         validate_and_send(q, time);
     }
 }
-void RobotController::add_target(Vec6& q, double T)
+void Ur10eController::add_target(Vec6& q, double T)
 {
     validate_and_send(q, T);
 }
@@ -427,7 +323,7 @@ void RobotController::add_target(Vec6& q, double T)
 //----------------------------
 // utility functions
 //----------------------------
-bool RobotController::validate_and_send(Vec6& joints, double dt)
+bool Ur10eController::validate_and_send(Vec6& joints, double dt)
 {
     bool success = true;
     // todo: add tests on the joint position
@@ -443,7 +339,7 @@ bool RobotController::validate_and_send(Vec6& joints, double dt)
 
     return success;
 }
-bool RobotController::validate_and_send(Vec6& joints)
+bool Ur10eController::validate_and_send(Vec6& joints)
 {
     return validate_and_send(joints, delta);
 }
@@ -453,105 +349,102 @@ bool RobotController::validate_and_send(Vec6& joints)
 //----------------------------
 // service callbacks
 //----------------------------
-bool RobotController::init(Empty::Request&, Empty::Response&)
+bool Ur10eController::init(Empty::Request&, Empty::Response&)
 {
     events.add(Command::init);
     return true;
 }
-bool RobotController::stop_trajectory(Empty::Request&, Empty::Response&)
+bool Ur10eController::stop_trajectory(Empty::Request&, Empty::Response&)
 {
     events.add(Command::stop);
     return true;
 }
-bool RobotController::start_velocity(Empty::Request&, Empty::Response&)
+bool Ur10eController::start_velocity(Empty::Request&, Empty::Response&)
 {
     events.add(Command::start_cart_velocity);
     return true;
 }
-bool RobotController::start_position(Empty::Request&, Empty::Response&)
+bool Ur10eController::start_position(Empty::Request&, Empty::Response&)
 {
     events.add(Command::start_joint_positiom);
     return true;
 }
-bool RobotController::start_home(Empty::Request&, Empty::Response&)
+bool Ur10eController::start_home(Empty::Request&, Empty::Response&)
 {
     events.add(Command::start_home);
     return true;
 }
-bool RobotController::reset_errors(Empty::Request&, Empty::Response&)
+bool Ur10eController::reset_errors(Empty::Request&, Empty::Response&)
 {
-    events.add(Command::reset);
+    events.add(Command::reset_errors);
     return true;
 }
+
 
 
 //----------------------------
 // subscriber callbacks
 //----------------------------
-void RobotController::robot_mode_callback(const RobotMode::ConstPtr& msg)
+void Ur10eController::robot_mode_callback(const RobotMode::ConstPtr& msg)
 {
     robot_mode = msg->mode;
 }
-void RobotController::state_callback(const TrajState::ConstPtr& msg)
+void Ur10eController::state_callback(const TrajState::ConstPtr& msg)
 {
     joints_msg = msg;
     cur_joint_pos = msg->actual.positions;
 }
-void RobotController::joy_callback(const Joy::ConstPtr& msg)
+void Ur10eController::joy_callback(const Joy::ConstPtr& msg)
 {
     //-- reset to zero
     cart_vel_goal = {0, 0, 0, 0, 0, 0};
     gripper_command = 0;
 
     //-- compute linear velocity
-    cart_vel_goal.x = -msg->axes[0] * linear_speed;
-    cart_vel_goal.y = msg->axes[1] * linear_speed;
+    cart_vel_goal.x = -msg->axes[0] * linear_speed * speed_scale;
+    cart_vel_goal.y = msg->axes[1] * linear_speed * speed_scale;
     if (msg->buttons[6] && !msg->buttons[7])
     {
-        cart_vel_goal.z = linear_speed;
+        cart_vel_goal.z = linear_speed * speed_scale;
     }
     else if (msg->buttons[7] && !msg->buttons[6])
     {
-        cart_vel_goal.z = -linear_speed;
+        cart_vel_goal.z = -linear_speed * speed_scale;
     }
 
     //-- compute angular velocity
     // x axis
     if (msg->axes[3] > 0.2)
     {
-        cart_vel_goal.wx = -angular_speed;
+        cart_vel_goal.wx = -angular_speed * speed_scale;
     }
     else if (msg->axes[3] < -0.2)
     {
-        cart_vel_goal.wx = angular_speed;
+        cart_vel_goal.wx = angular_speed * speed_scale;
     }
     // y axis
     if (msg->axes[2] > 0.2)
     {
-        cart_vel_goal.wy = angular_speed;
+        cart_vel_goal.wy = angular_speed * speed_scale;
     }
     else if (msg->axes[2] < -0.2)
     {
-        cart_vel_goal.wy = -angular_speed;
+        cart_vel_goal.wy = -angular_speed * speed_scale;
     }
     // z axis
     if (msg->buttons[5] && !msg->buttons[4])
     {
-        cart_vel_goal.wz = angular_speed;
+        cart_vel_goal.wz = angular_speed * speed_scale;
     }
     else if (msg->buttons[4] && !msg->buttons[5])
     {
-        cart_vel_goal.wz = -angular_speed;
+        cart_vel_goal.wz = -angular_speed * speed_scale;
     }
 
     //-- button to start the velocity control
     if (msg->buttons[2])
     {
         events.add(Command::stop);
-    }
-    else if (msg->buttons[1])
-    {
-        events.add(Command::start_cart_velocity);
     }
     if (msg->buttons[0] && !msg->buttons[3])
     {
@@ -564,6 +457,10 @@ void RobotController::joy_callback(const Joy::ConstPtr& msg)
 
     //-- store message
     joy_msg = msg;
+}
+void Ur10eController::speed_scale_callback(const std_msgs::Float64::ConstPtr& msg)
+{
+    speed_scale = msg->data;
 }
 
 

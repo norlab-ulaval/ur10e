@@ -13,6 +13,7 @@ enum class Error
     robot_wrong_mode,       // The mode reported by the robot is not right for the current state of this controller.
     program_load,           // The robot could not load the program.
     program_play,           // The robot could not play the program.
+    assertion,              // An assertion failed
 };
 
 // types of command events
@@ -20,7 +21,7 @@ enum class Command
 {
     init,                   // initialize the robot
     stop,                   // stop the current trajectory or motion mode
-    reset,                  // reset errors and allow further robot control
+    reset_errors,           // reset errors and allow further robot control
     start_home,             // start the homing procedure
     start_cart_velocity,    // start the joystick control mode
     start_joint_positiom,   // start the joint position mode

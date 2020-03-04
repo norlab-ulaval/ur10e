@@ -7,6 +7,7 @@
 #include <sensor_msgs/Joy.h>
 #include <std_msgs/UInt16.h>
 #include <std_msgs/Empty.h>
+#include <std_msgs/Float64.h>
 #include <trajectory_msgs/JointTrajectory.h>
 
 #include <control_msgs/FollowJointTrajectoryAction.h>
@@ -38,17 +39,22 @@ using ros::Subscriber;
 using ur10e_messages::State;
 
 
-class RobotController
+class Ur10eController
 {
 public:
     const double delta = 0.1;
+
     uint state = State::uninitialized;
+    uint last_state = State::uninitialized;
+    uint next_state = State::uninitialized;
+
     Publisher state_pub;
     State state_msg;
 
     EventsManager events;
     ur10e robot;
     int robot_mode = -100;
+    double speed_scale = 0.0;
 
     // ROS messaging
     TrajClient* traj_client;
@@ -65,12 +71,12 @@ public:
     Mat3 cur_cart_rot_goal; // cartesian
 
     //--- construction and destruction
-    RobotController();
-    ~RobotController();
+    Ur10eController();
+    ~Ur10eController();
 
     //--- state machine functions
+    inline void assert_ur(bool expr, const char* msg);
     void control(const ros::TimerEvent&);
-    void init_control();
     void velocity_control();
     void position_control();
 
@@ -86,6 +92,7 @@ public:
     void state_callback(const TrajState::ConstPtr& pos);
     void joy_callback(const Joy::ConstPtr& joy);
     void robot_mode_callback(const RobotMode::ConstPtr& msg);
+    void speed_scale_callback(const std_msgs::Float64::ConstPtr& msg);
 
     //--- service callbacks
     bool init(Empty::Request&, Empty::Response&);
@@ -103,4 +110,13 @@ void print(const char* prefix, const Mat3& m);
 void print(const char* prefix, const Command& cmd);
 
 Vec6 to_deg(const Vec6& q);
+
+inline void Ur10eController::assert_ur(bool expr, const char* msg)
+{
+    if (!expr)
+    {
+        events.add(Error::assertion);
+        ROS_ERROR("%s", msg);
+    }
+}
 

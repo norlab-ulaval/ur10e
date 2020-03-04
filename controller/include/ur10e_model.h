@@ -20,5 +20,14 @@ struct ur10e
     void reset();
     void calibrate();
     void fk(Vec6& q, Vec3& pos_result, Mat3& Q_result);
-    bool ik(Vec3 tar_pos, Mat3 tar_rot, Vec6 joint_guess, Vec6& joint_result);
+    // Perform the inverse kinematics.
+    // @param tar_pos: the cartesian position to reach
+    // @param tar_rot: the rotation matrix representing the orientation to reach
+    // @param joint_guess: the initial guess in joint space
+    // @param joint_result: the joint position where the result is stored
+    // @out : true if the inverse kinematics converges
+    //
+    // - joint_result is only modified if the inverse kinematics converges (i.e. if output is true) it does NOT contain the closest point it found.
+    // - all other params are never modified
+    bool ik(Vec3& tar_pos, Mat3& tar_rot, Vec6& joint_guess, Vec6& joint_result);
 };

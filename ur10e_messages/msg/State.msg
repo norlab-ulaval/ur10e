@@ -1,5 +1,4 @@
 uint16 uninitialized = 0
-uint16 initializing = 1
 uint16 standstill = 10
 uint16 cart_velocity = 100
 uint16 joint_position = 200

@@ -38,8 +38,8 @@ class Gui(Plugin):
         self.update_state()
 
         # connect signals
-        self._widget.pb_init.clicked.connect(self.init_pressed)
         self._widget.pb_home.clicked.connect(self.home_pressed)
+        self._widget.pb_start.clicked.connect(self.start_pressed)
         self._widget.pb_velocity.clicked.connect(self.velocity_pressed)
         self._widget.pb_position.clicked.connect(self.position_pressed)
         self._widget.pb_stop.clicked.connect(self.stop_pressed)
@@ -74,22 +74,16 @@ class Gui(Plugin):
         self._widget.pb_stop.setStyleSheet("background-color: white")
         self._widget.pb_error.setEnabled(False)
         self._widget.pb_error.setStyleSheet("background-color: white")
-        self._widget.pb_init.setEnabled(False)
-        self._widget.pb_init.setStyleSheet("background-color: white")
         self._widget.pb_home.setEnabled(False)
         self._widget.pb_home.setStyleSheet("background-color: white")
         self._widget.pb_start.setEnabled(False)
         self._widget.pb_start.setStyleSheet("background-color: white")
 
         if self.state == State.uninitialized:
-            self._widget.pb_init.setEnabled(True)
+            self._widget.pb_start.setEnabled(True)
             self._widget.pb_start.setStyleSheet(
                 "background-color:rgb(114, 159, 207); color: white;"
             )
-
-        if self.state == State.initializing:
-            self._widget.pb_init.setEnabled(False)
-            self._widget.pb_init.setStyleSheet("background-color:rgb(114, 159, 207); color: white;")
 
         elif self.state == State.standstill:
             self._widget.pb_position.setEnabled(True)
@@ -124,7 +118,7 @@ class Gui(Plugin):
         self._widget.tab.setCurrentIndex(0)
 
     @Slot()
-    def init_pressed(self):
+    def start_pressed(self):
         try:
             init()
         except Exception:
